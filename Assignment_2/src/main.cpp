@@ -13,6 +13,83 @@
 // Shortcut to avoid Eigen:: everywhere, DO NOT USE IN .h
 using namespace Eigen;
 
+bool intersect_ray_triangle(const Vector3d& ray_origin, const Vector3d& ray_direction, const Vector3d& v0, const Vector3d& v1, const Vector3d& v2, Vector3d& intersection){
+
+/* using Möller Trumbore ray triangle intersection algorithm 
+*  Resources:
+*   1. https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/moller-trumbore-ray-triangle-intersection.html
+*   2. https://www.youtube.com/watch?v=fK1RPmF_zjQ
+*   3. https://www.realtimerendering.com/intersections.html
+*  
+*/
+    Vector3d edge1 = v1 - v0;
+    Vector3d edge2 = v2 - v0; 
+    Vector3d ray_direction_cross_e2 = ray_direction.cross(edge2);
+    double det = edge1.dot(ray_direction_cross_e2);
+
+    if( det < __DBL_EPSILON__)
+    {
+        return false;  //ray is parallel to triangle 
+    }
+
+    // calculate distance from v0 to ray_origin
+    Vector3d v0_to_ray_origin = ray_origin - v0;
+    
+    double inverted_det = 1.0/det; 
+
+    //calculate u and check bounds
+    double u = inverted_det * v0_to_ray_origin.dot(ray_direction_cross_e2);
+
+    if(u< 0.0 || u > 1.0)
+    {
+        return false;
+    }
+
+    //calculate v and check bounds 
+    Vector3d q = v0_to_ray_origin.cross(edge1);
+    double v = det * ray_direction.dot(q);
+
+    if (v < 0.0 || u + v > 1.0)
+    {
+        return false;
+    }
+
+    //calculate intersection point
+
+    double t = det * edge2.dot(q);
+
+    if(t> __DBL_EPSILON__)
+    {
+        intersection = ray_origin + t *ray_direction; 
+        return true;
+    }
+
+    return false; 
+}
+
+bool parallelogram_into_triangles_intersection(const Vector3d& ray_origin, const Vector3d& ray_direction, const Vector3d& pgram_origin, const Vector3d& pgram_u, const Vector3d& pgram_v, Vector3d& intersection)
+{ 
+    // split parallelogram into two triangles 
+    Vector3d v0 = pgram_origin;
+    Vector3d v1 = pgram_origin + pgram_u;
+    Vector3d v2 = pgram_origin + pgram_v;
+    Vector3d v3 = pgram_origin + pgram_u + pgram_v;
+
+    // Check intersection with the triangle 1
+    if (intersect_ray_triangle(ray_origin, ray_direction, v0, v1, v2, intersection)) {
+        return true;
+    }
+
+    // Check intersection with triangle 2
+    if (intersect_ray_triangle(ray_origin, ray_direction, v1, v2, v3, intersection)) {
+        return true;
+    }
+
+    // No intersection with triangles
+    return false;
+    }
+
+
 void raytrace_sphere()
 {
     std::cout << "Simple ray tracer, one sphere with orthographic projection" << std::endl;
@@ -109,6 +186,8 @@ void raytrace_parallelogram()
             const Vector3d ray_direction = camera_view_direction;
 
             // TODO: Check if the ray intersects with the parallelogram
+            Vector3d intersection;
+
             if (true)
             {
                 // TODO: The ray hit the parallelogram, compute the exact intersection
