@@ -13,7 +13,7 @@
 // Shortcut to avoid Eigen:: everywhere, DO NOT USE IN .h
 using namespace Eigen;
 
-bool intersect_ray_triangle(const Vector3d& ray_origin, const Vector3d& ray_direction, const Vector3d& v0, const Vector3d& v1, const Vector3d& v2, Vector3d& intersection){
+bool intersect_ray_triangle(const Vector3d& ray_origin, const Vector3d& ray_direction, const Vector3d& v0, const Vector3d& v1, const Vector3d& v2, Vector3d& ray_intersection){
 
 /* using Möller Trumbore ray triangle intersection algorithm 
 *  Resources:
@@ -27,7 +27,7 @@ bool intersect_ray_triangle(const Vector3d& ray_origin, const Vector3d& ray_dire
     Vector3d ray_direction_cross_e2 = ray_direction.cross(edge2);
     double det = edge1.dot(ray_direction_cross_e2);
 
-    if( det < __DBL_EPSILON__)
+    if( fabs(det) < __DBL_EPSILON__)
     {
         return false;  //ray is parallel to triangle 
     }
@@ -47,7 +47,7 @@ bool intersect_ray_triangle(const Vector3d& ray_origin, const Vector3d& ray_dire
 
     //calculate v and check bounds 
     Vector3d q = v0_to_ray_origin.cross(edge1);
-    double v = det * ray_direction.dot(q);
+    double v = inverted_det * ray_direction.dot(q);
 
     if (v < 0.0 || u + v > 1.0)
     {
@@ -56,39 +56,77 @@ bool intersect_ray_triangle(const Vector3d& ray_origin, const Vector3d& ray_dire
 
     //calculate intersection point
 
-    double t = det * edge2.dot(q);
+    double t = inverted_det * edge2.dot(q);
 
     if(t> __DBL_EPSILON__)
     {
-        intersection = ray_origin + t *ray_direction; 
+        ray_intersection = ray_origin + t*ray_direction; 
         return true;
     }
 
     return false; 
 }
 
-bool parallelogram_into_triangles_intersection(const Vector3d& ray_origin, const Vector3d& ray_direction, const Vector3d& pgram_origin, const Vector3d& pgram_u, const Vector3d& pgram_v, Vector3d& intersection)
+bool parallelogram_into_triangles_intersection(const Vector3d& ray_origin, const Vector3d& ray_direction, const Vector3d& pgram_origin, const Vector3d& pgram_u, const Vector3d& pgram_v, Vector3d& ray_intersection)
 { 
+    
     // split parallelogram into two triangles 
     Vector3d v0 = pgram_origin;
     Vector3d v1 = pgram_origin + pgram_u;
     Vector3d v2 = pgram_origin + pgram_v;
     Vector3d v3 = pgram_origin + pgram_u + pgram_v;
 
-    // Check intersection with the triangle 1
-    if (intersect_ray_triangle(ray_origin, ray_direction, v0, v1, v2, intersection)) {
+    // Check intersection with the triangles
+    if(intersect_ray_triangle(ray_origin, ray_direction, v0, v1, v2, ray_intersection))
+    {
+        return true;
+    }
+    if(intersect_ray_triangle(ray_origin, ray_direction, v1, v2, v3, ray_intersection))
+    {
         return true;
     }
 
-    // Check intersection with triangle 2
-    if (intersect_ray_triangle(ray_origin, ray_direction, v1, v2, v3, intersection)) {
-        return true;
-    }
-
-    // No intersection with triangles
     return false;
+
+}
+
+bool intersect_sphere(const Vector3d& ray_origin, const Vector3d& ray_direction, const Vector3d& sphere_center, double sphere_radius, double& t)
+{
+    Vector3d center_to_origin =  ray_origin - sphere_center; 
+
+    // define quadratic formula from lecture 
+    double a = ray_direction.dot(ray_direction); 
+    double b = 2.0 * center_to_origin.dot(ray_direction);
+    double c = center_to_origin.dot(center_to_origin) - (sphere_radius * sphere_radius); 
+
+    double x = ((b*b) - (4*a*c) ); 
+
+    // check to see if quadratic has a solution 
+    if(x < 0)
+    {
+        return false; 
     }
 
+    x = sqrt(x); 
+    double t1 =(-b + x)/(2*a);
+    double t2 =(-b - x)/(2*a);
+
+    //determine closest solution to sphere
+    if(t1 < 0 && t2 < 0){
+        return false; 
+    }
+    else if( t1 < 0 || t1 >= t2 && t2> 0){
+        t = t2; 
+    }
+    else if(t2< 0 || t2>=t1 && t1>0){
+        t = t1;
+    }
+
+    return true; 
+
+
+
+}
 
 void raytrace_sphere()
 {
@@ -184,19 +222,17 @@ void raytrace_parallelogram()
             // Prepare the ray
             const Vector3d ray_origin = pixel_center;
             const Vector3d ray_direction = camera_view_direction;
+            Vector3d ray_intersection;
 
             // TODO: Check if the ray intersects with the parallelogram
-            Vector3d intersection;
-
-            if (true)
+            if(parallelogram_into_triangles_intersection(ray_origin,ray_direction, pgram_origin, pgram_u, pgram_v, ray_intersection))
             {
-                // TODO: The ray hit the parallelogram, compute the exact intersection
-                // point
-                Vector3d ray_intersection(0, 0, 0);
+                // TODO: The ray hit the parallelogram, compute the exact intersection point
+                /*stored in intersect_ray_triangle() function*/
 
                 // TODO: Compute normal at the intersection point
-                Vector3d ray_normal = ray_intersection.normalized();
 
+                Vector3d ray_normal = -(pgram_u.cross(pgram_v).normalized());
                 // Simple diffuse model
                 C(i, j) = (light_position - ray_intersection).normalized().transpose() * ray_normal;
 
@@ -243,22 +279,22 @@ void raytrace_perspective()
         {
             const Vector3d pixel_center = image_origin + double(i) * x_displacement + double(j) * y_displacement;
 
-            // TODO: Prepare the ray (origin point and direction)
-            const Vector3d ray_origin = pixel_center;
-            const Vector3d ray_direction = camera_view_direction;
+            // TODO: Prepare the ray (origin point and direction) 
+            const Vector3d ray_direction = (pixel_center - camera_origin).normalized();
+            Vector3d ray_intersection;
 
             // TODO: Check if the ray intersects with the parallelogram
-            if (true)
+            if (parallelogram_into_triangles_intersection(camera_origin,ray_direction, pgram_origin, pgram_u, pgram_v, ray_intersection))
             {
                 // TODO: The ray hit the parallelogram, compute the exact intersection point
-                Vector3d ray_intersection(0, 0, 0);
+                /*stored in intersect_ray_triangle() function*/
 
                 // TODO: Compute normal at the intersection point
-                Vector3d ray_normal = ray_intersection.normalized();
+                Vector3d ray_normal = -(pgram_u.cross(pgram_v).normalized());
 
                 // Simple diffuse model
                 C(i, j) = (light_position - ray_intersection).normalized().transpose() * ray_normal;
-
+                
                 // Clamp to zero
                 C(i, j) = std::max(C(i, j), 0.);
 
@@ -313,15 +349,17 @@ void raytrace_shading()
 
             // Intersect with the sphere
             // TODO: implement the generic ray sphere intersection
-            if (true)
+            double t;
+            if (intersect_sphere(pixel_center, ray_direction, sphere_center, sphere_radius, t))
             {
                 // TODO: The ray hit the sphere, compute the exact intersection point
-                Vector3d ray_intersection(0, 0, 0);
+                Vector3d ray_intersection = ray_origin + t* ray_direction;
 
                 // TODO: Compute normal at the intersection point
-                Vector3d ray_normal = ray_intersection.normalized();
+                Vector3d ray_normal = (ray_intersection - sphere_center).normalized();
 
                 // TODO: Add shading parameter here
+                Vector3d v = (light_position - ray_intersection).normalized();
                 const double diffuse = (light_position - ray_intersection).normalized().dot(ray_normal);
                 const double specular = (light_position - ray_intersection).normalized().dot(ray_normal);
 
