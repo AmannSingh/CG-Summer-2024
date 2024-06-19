@@ -359,7 +359,6 @@ void raytrace_shading()
                 Vector3d ray_normal = (ray_intersection - sphere_center).normalized();
 
                 // TODO: Add shading parameter here
-                Vector3d v = (light_position - ray_intersection).normalized();
                 const double diffuse = (light_position - ray_intersection).normalized().dot(ray_normal);
                 const double specular = (light_position - ray_intersection).normalized().dot(ray_normal);
 
