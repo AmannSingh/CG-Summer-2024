@@ -57,6 +57,7 @@ bool intersect_ray_triangle(const Vector3d& ray_origin, const Vector3d& ray_dire
     //calculate intersection point
 
     double t = inverted_det * edge2.dot(q);
+    
 
     if(t> __DBL_EPSILON__)
     {
