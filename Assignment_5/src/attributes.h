@@ -52,4 +52,6 @@ public:
 class UniformAttributes
 {
 public:
+    Eigen::Matrix4f view;
+    Eigen::Vector4f color;
 };
