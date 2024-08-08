@@ -21,10 +21,13 @@ public:
     {
         VertexAttributes r;
         r.position = alpha * a.position + beta * b.position + gamma * c.position;
+        r.color = a.color * alpha + b.color * beta + c.color * gamma;
         return r;
     }
 
     Eigen::Vector4d position;
+    Eigen::Vector4d color;
+    Eigen::Vector3d normal;
 };
 
 class FragmentAttributes
@@ -36,6 +39,7 @@ public:
     }
 
     Eigen::Vector4d color;
+    Eigen::Vector4d position;
 };
 
 class FrameBufferAttributes
@@ -44,14 +48,15 @@ public:
     FrameBufferAttributes(double r = 0, double g = 0, double b = 0, double a = 1)
     {
         color << r, g, b, a;
+        depth = 2;
     }
 
     Eigen::Matrix<double, 4, 1> color;
+    double depth;
 };
 
 class UniformAttributes
 {
 public:
-    Eigen::Matrix4f view;
-    Eigen::Vector4f color;
+    Eigen::Matrix4d view;
 };
